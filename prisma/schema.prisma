@@ -1,13 +1,173 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  username      String?   @unique
+  spotifyId     String?   @unique
+  createdAt     DateTime  @default(now())
+
+  accounts      Account[]
+  sessions      Session[]
+  albumReviews  AlbumReview[]
+  trackRatings  TrackRating[]
+  playlists     Playlist[]
+  friendsAsA    Friendship[]  @relation("UserA")
+  friendsAsB    Friendship[]  @relation("UserB")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Album {
+  id             String        @id @default(cuid())
+  spotifyAlbumId String        @unique
+  title          String
+  artistName     String
+  coverUrl       String?
+  releaseYear    Int?
+  genres         String[]
+
+  tracks         Track[]
+  reviews        AlbumReview[]
+}
+
+model Track {
+  id             String        @id @default(cuid())
+  spotifyTrackId String        @unique
+  albumId        String
+  title          String
+  durationMs     Int?
+  trackNumber    Int?
+  bpm            Float?
+
+  album          Album         @relation(fields: [albumId], references: [id])
+  ratings        TrackRating[]
+  playlistTracks PlaylistTrack[]
+}
+
+model AlbumReview {
+  id              String   @id @default(cuid())
+  userId          String
+  albumId         String
+  rating          Float
+  isLoved         Boolean  @default(false)
+  isVisible       Boolean  @default(true)
+  notes           String?  @db.Text
+  lyricsScore     Int?
+  productionScore Int?
+  replayScore     Int?
+  emotionScore    Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  album           Album    @relation(fields: [albumId], references: [id])
+  tags            ReviewTag[]
+
+  @@unique([userId, albumId])
+}
+
+model TrackRating {
+  id        String   @id @default(cuid())
+  userId    String
+  trackId   String
+  rating    Float
+  isLoved   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track     Track    @relation(fields: [trackId], references: [id])
+
+  @@unique([userId, trackId])
+}
+
+model Tag {
+  id      String      @id @default(cuid())
+  name    String      @unique
+  type    String
+
+  reviews ReviewTag[]
+}
+
+model ReviewTag {
+  reviewId String
+  tagId    String
+
+  review   AlbumReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  tag      Tag         @relation(fields: [tagId], references: [id])
+
+  @@id([reviewId, tagId])
+}
+
+model Friendship {
+  id        String   @id @default(cuid())
+  userAId   String
+  userBId   String
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+
+  userA     User     @relation("UserA", fields: [userAId], references: [id])
+  userB     User     @relation("UserB", fields: [userBId], references: [id])
+
+  @@unique([userAId, userBId])
+}
+
+model Playlist {
+  id                String          @id @default(cuid())
+  userId            String
+  title             String
+  sourceGenres      String[]
+  minRating         Float           @default(0)
+  playlistType      String?
+  spotifyPlaylistId String?
+  createdAt         DateTime        @default(now())
+
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tracks            PlaylistTrack[]
+}
+
+model PlaylistTrack {
+  playlistId String
+  trackId    String
+  position   Int
+
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  track      Track    @relation(fields: [trackId], references: [id])
+
+  @@id([playlistId, trackId])
 }
