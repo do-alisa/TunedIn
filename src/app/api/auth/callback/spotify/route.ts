@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect("http://127.0.0.1:3000/login?error=spotify")
   }
 
-  // Exchange code for tokens
   const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: {
@@ -37,13 +36,11 @@ export async function GET(request: NextRequest) {
 
   const tokens = await tokenRes.json()
 
-  // Get Spotify user profile
   const profileRes = await fetch("https://api.spotify.com/v1/me", {
     headers: { Authorization: `Bearer ${tokens.access_token}` },
   })
   const profile = await profileRes.json()
 
-  // Upsert user in database
   const user = await prisma.user.upsert({
     where: { email: profile.email },
     update: {
@@ -60,14 +57,39 @@ export async function GET(request: NextRequest) {
     },
   })
 
-  // Create a simple session cookie
   const sessionToken = crypto.randomBytes(32).toString("hex")
 
   await prisma.session.create({
     data: {
       sessionToken,
       userId: user.id,
-      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    },
+  })
+
+  // Store spotify access token separately
+  await prisma.account.upsert({
+    where: {
+      provider_providerAccountId: {
+        provider: "spotify",
+        providerAccountId: profile.id,
+      },
+    },
+    update: {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: Math.floor(Date.now() / 1000) + tokens.expires_in,
+    },
+    create: {
+      userId: user.id,
+      type: "oauth",
+      provider: "spotify",
+      providerAccountId: profile.id,
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: Math.floor(Date.now() / 1000) + tokens.expires_in,
+      scope: tokens.scope,
+      token_type: tokens.token_type,
     },
   })
 
