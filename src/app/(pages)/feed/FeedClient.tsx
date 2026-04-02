@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 
 type Album = {
   id: string
@@ -140,9 +141,9 @@ export default function FeedClient({ userName }: { userName: string }) {
             <h1 className="text-3xl font-bold">TunedIn</h1>
             <p className="text-zinc-400 mt-1">Welcome back, {userName}</p>
           </div>
-          <button onClick={loadReviews} className="text-sm text-zinc-400 hover:text-white transition-colors">
+          <Link href="/profile" className="text-sm text-zinc-400 hover:text-white transition-colors">
             My Reviews
-          </button>
+          </Link>
         </div>
 
         {submitted && (
