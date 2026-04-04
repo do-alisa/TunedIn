@@ -19,6 +19,7 @@ export async function GET() {
     scope: SCOPES,
     redirect_uri: "http://127.0.0.1:3000/api/auth/callback/spotify",
     state,
+    show_dialog: "true",
   })
 
   return NextResponse.redirect(

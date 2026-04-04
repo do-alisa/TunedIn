@@ -11,6 +11,14 @@ type Album = {
   release_date: string
 }
 
+type SpotifyTrack = {
+  id: string
+  name: string
+  track_number: number
+  duration_ms: number
+  uri: string
+}
+
 type Review = {
   id: string
   rating: number
@@ -23,9 +31,10 @@ type Review = {
   album: { title: string; artistName: string; coverUrl: string | null }
 }
 
-function StarRating({ rating, onChange }: { rating: number; onChange: (r: number) => void }) {
+function StarRating({ rating, onChange, size = "md" }: { rating: number; onChange?: (r: number) => void; size?: "sm" | "md" }) {
   const [hover, setHover] = useState(0)
   const display = hover || rating
+  const dim = size === "sm" ? "w-4 h-4" : "w-7 h-7"
 
   return (
     <div className="flex items-center gap-0.5">
@@ -33,37 +42,85 @@ function StarRating({ rating, onChange }: { rating: number; onChange: (r: number
         const full = display >= star
         const half = !full && display >= star - 0.5
         return (
-          <div key={star} className="relative w-7 h-7 cursor-pointer">
-            <svg viewBox="0 0 24 24" className="w-7 h-7 absolute">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
-                fill={full ? "#eac54f" : half ? "url(#half)" : "none"}
-                stroke={full || half ? "#eac54f" : "#52525b"}
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-              />
+          <div key={star} className={"relative " + dim + (onChange ? " cursor-pointer" : "")}>
+            <svg viewBox="0 0 24 24" className={"absolute " + dim}>
               <defs>
-                <linearGradient id="half">
+                <linearGradient id={"half-" + star}>
                   <stop offset="50%" stopColor="#eac54f"/>
                   <stop offset="50%" stopColor="transparent"/>
                 </linearGradient>
               </defs>
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                fill={full ? "#eac54f" : half ? "url(#half-" + star + ")" : "none"}
+                stroke={full || half ? "#eac54f" : "#52525b"}
+                strokeWidth="1.5" strokeLinejoin="round"/>
             </svg>
-            <div className="absolute inset-0 flex">
-              <div className="w-1/2 h-full"
-                onMouseEnter={() => setHover(star - 0.5)}
-                onMouseLeave={() => setHover(0)}
-                onClick={() => onChange(star - 0.5)}
-              />
-              <div className="w-1/2 h-full"
-                onMouseEnter={() => setHover(star)}
-                onMouseLeave={() => setHover(0)}
-                onClick={() => onChange(star)}
-              />
-            </div>
+            {onChange && (
+              <div className="absolute inset-0 flex">
+                <div className="w-1/2 h-full"
+                  onMouseEnter={() => setHover(star - 0.5)}
+                  onMouseLeave={() => setHover(0)}
+                  onClick={() => onChange(star - 0.5)} />
+                <div className="w-1/2 h-full"
+                  onMouseEnter={() => setHover(star)}
+                  onMouseLeave={() => setHover(0)}
+                  onClick={() => onChange(star)} />
+              </div>
+            )}
           </div>
         )
       })}
-      <span className="ml-2 text-zinc-400 text-sm w-8 text-right inline-block">{display > 0 ? `${display}/5` : ""}</span>
+      {onChange && <span className="ml-2 text-zinc-400 text-sm w-8 text-right inline-block">{display > 0 ? display + "/5" : ""}</span>}
+    </div>
+  )
+}
+
+function msToTime(ms: number) {
+  const s = Math.floor(ms / 1000)
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`
+}
+
+function PlaylistStarPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [hover, setHover] = useState(0)
+  const [dragStart, setDragStart] = useState<number | null>(null)
+  const display = hover || value
+
+  return (
+    <div className="space-y-1">
+      <div className="flex" onMouseLeave={() => setHover(0)}>
+        {[1, 2, 3, 4, 5].map(star => {
+          const full = display >= star
+          const half = !full && display >= star - 0.5
+          return (
+            <div key={star} className="relative w-9 h-9 cursor-pointer select-none">
+              <svg viewBox="0 0 24 24" className="w-9 h-9 absolute pointer-events-none">
+                <defs>
+                  <linearGradient id={"pl-half-" + star}>
+                    <stop offset="50%" stopColor="#eac54f"/>
+                    <stop offset="50%" stopColor="transparent"/>
+                  </linearGradient>
+                </defs>
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                  fill={full ? "#eac54f" : half ? "url(#pl-half-"+star+")" : "none"}
+                  stroke={full || half ? "#eac54f" : "#52525b"}
+                  strokeWidth="1.5" strokeLinejoin="round"/>
+              </svg>
+              <div className="absolute inset-0 flex">
+                <div className="w-1/2 h-full"
+                  onMouseEnter={() => setHover(star - 0.5)}
+                  onMouseDown={() => setDragStart(star - 0.5)}
+                  onMouseUp={() => { onChange(dragStart !== null && dragStart !== star - 0.5 ? Math.min(dragStart, star - 0.5) : star - 0.5); setDragStart(null) }} />
+                <div className="w-1/2 h-full"
+                  onMouseEnter={() => setHover(star)}
+                  onMouseDown={() => setDragStart(star)}
+                  onMouseUp={() => { onChange(star); setDragStart(null) }} />
+              </div>
+            </div>
+          )
+        })}
+        <span className="ml-2 self-center text-zinc-400 text-sm">{value}+ stars</span>
+      </div>
+      <p className="text-zinc-600 text-xs">Click to set minimum rating</p>
     </div>
   )
 }
@@ -74,6 +131,7 @@ export default function FeedClient({ userName }: { userName: string }) {
   const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState<Album | null>(null)
   const [rating, setRating] = useState(0)
+  const [hoverRating, setHoverRating] = useState(0)
   const [isLoved, setIsLoved] = useState(false)
   const [notes, setNotes] = useState("")
   const [lyricsScore, setLyricsScore] = useState(3)
@@ -85,11 +143,20 @@ export default function FeedClient({ userName }: { userName: string }) {
   const [productionEnabled, setProductionEnabled] = useState(false)
   const [replayEnabled, setReplayEnabled] = useState(false)
   const [emotionEnabled, setEmotionEnabled] = useState(false)
+  const [tracks, setTracks] = useState<SpotifyTrack[]>([])
+  const [trackRatings, setTrackRatings] = useState<Record<string, number>>({})
+  const [loadingTracks, setLoadingTracks] = useState(false)
+  const [listenedAt, setListenedAt] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  })
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-  const [reviews, setReviews] = useState<Review[]>([])
-  const [showReviews, setShowReviews] = useState(false)
-  const [expandedReview, setExpandedReview] = useState<string | null>(null)
+  const [showPlaylist, setShowPlaylist] = useState(false)
+  const [minRating, setMinRating] = useState(4)
+  const [playlistName, setPlaylistName] = useState("")
+  const [generating, setGenerating] = useState(false)
+  const [generatedPlaylist, setGeneratedPlaylist] = useState<{ url: string; trackCount: number; albumCount: number } | null>(null)
 
   async function search() {
     if (!query.trim()) return
@@ -101,17 +168,23 @@ export default function FeedClient({ userName }: { userName: string }) {
     setSearching(false)
   }
 
-  async function loadReviews() {
-    const res = await fetch("/api/reviews")
+  async function selectAlbum(album: Album) {
+    setSelected(album)
+    setAlbums([])
+    setLoadingTracks(true)
+    const res = await fetch("/api/search?tracklist=" + album.id)
     const data = await res.json()
-    setReviews(data.reviews ?? [])
-    setShowReviews(true)
+    setTracks(data.tracks ?? [])
+    setLoadingTracks(false)
   }
 
   async function submitReview() {
-    if (!selected || rating === 0) return
+    const ratedTrackCount = Object.keys(trackRatings).length
+    if (!selected) return
+    if (rating === 0 && ratedTrackCount === 0) return
     setSubmitting(true)
-    await fetch("/api/reviews", {
+
+    const reviewRes = await fetch("/api/reviews", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -120,17 +193,73 @@ export default function FeedClient({ userName }: { userName: string }) {
         artistName: selected.artists[0]?.name,
         coverUrl: selected.images[0]?.url,
         releaseYear: parseInt(selected.release_date?.split("-")[0] ?? "0"),
-        rating, isLoved, notes, lyricsScore: lyricsEnabled ? lyricsScore : null, productionScore: productionEnabled ? productionScore : null, replayScore: replayEnabled ? replayScore : null, emotionScore: emotionEnabled ? emotionScore : null,
+        rating, isLoved, notes, listenedAt,
+        lyricsScore: lyricsEnabled ? lyricsScore : null,
+        productionScore: productionEnabled ? productionScore : null,
+        replayScore: replayEnabled ? replayScore : null,
+        emotionScore: emotionEnabled ? emotionScore : null,
       }),
     })
+    const reviewData = await reviewRes.json()
+
+    // Save track ratings if any
+    const ratedTracks = tracks
+      .filter(t => trackRatings[t.id])
+      .map(t => ({
+        spotifyTrackId: t.id,
+        title: t.name,
+        trackNumber: t.track_number,
+        durationMs: t.duration_ms,
+        rating: trackRatings[t.id],
+      }))
+
+    if (ratedTracks.length > 0 && reviewData.albumDbId) {
+      await fetch("/api/track-ratings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tracks: ratedTracks, albumId: reviewData.albumDbId }),
+      })
+    }
+
     setSubmitting(false)
     setSubmitted(true)
     setSelected(null)
     setRating(0)
     setNotes("")
     setIsLoved(false)
+    setLyricsScore(3)
+    setProductionScore(3)
+    setReplayScore(3)
+    setEmotionScore(3)
+    setLyricsEnabled(false)
+    setProductionEnabled(false)
+    setReplayEnabled(false)
+    setEmotionEnabled(false)
+    setShowSliders(false)
+    setListenedAt(new Date().toISOString().split('T')[0])
+    setTracks([])
+    setTrackRatings({})
     setTimeout(() => setSubmitted(false), 3000)
   }
+
+  async function generatePlaylist() {
+    setGenerating(true)
+    setGeneratedPlaylist(null)
+    const res = await fetch("/api/playlists", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ minRating, playlistName }),
+    })
+    const data = await res.json()
+    if (data.playlistUrl) {
+      setGeneratedPlaylist({ url: data.playlistUrl, trackCount: data.trackCount, albumCount: data.albumCount })
+    } else {
+      alert(data.error ?? "Something went wrong")
+    }
+    setGenerating(false)
+  }
+
+  const displayRating = hoverRating || rating
 
   return (
     <main className="min-h-screen bg-zinc-950 text-white">
@@ -153,8 +282,7 @@ export default function FeedClient({ userName }: { userName: string }) {
         )}
 
         <div className="flex gap-3 mb-8">
-          <input
-            type="text" value={query}
+          <input type="text" value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter") search() }}
             placeholder="Search for an album..."
@@ -169,8 +297,7 @@ export default function FeedClient({ userName }: { userName: string }) {
         {albums.length > 0 && !selected && (
           <div className="grid grid-cols-3 gap-4 mb-8">
             {albums.map(album => (
-              <button key={album.id}
-                onClick={() => { setSelected(album); setAlbums([]) }}
+              <button key={album.id} onClick={() => selectAlbum(album)}
                 className="text-left bg-zinc-900 hover:bg-zinc-800 rounded-lg p-3 transition-colors">
                 {album.images[0] && (
                   <img src={album.images[0].url} alt={album.name}
@@ -185,6 +312,8 @@ export default function FeedClient({ userName }: { userName: string }) {
 
         {selected && (
           <div className="bg-zinc-900 rounded-xl p-6 mb-8">
+
+            {/* Album header */}
             <div className="flex gap-4 mb-6">
               {selected.images[0] && (
                 <img src={selected.images[0].url} alt={selected.name}
@@ -195,14 +324,51 @@ export default function FeedClient({ userName }: { userName: string }) {
                 <p className="text-zinc-400">{selected.artists[0]?.name}</p>
                 <p className="text-zinc-500 text-sm">{selected.release_date?.split("-")[0]}</p>
               </div>
-              <button onClick={() => setSelected(null)} className="text-zinc-500 hover:text-white text-xl self-start">x</button>
+              <button onClick={() => { setSelected(null); setTracks([]); setTrackRatings({}) }}
+                className="text-zinc-500 hover:text-white text-xl self-start">x</button>
             </div>
 
+            {/* Album rating */}
             <div className="mb-5">
-              <p className="text-sm text-zinc-400 mb-2">Rating</p>
-              <StarRating rating={rating} onChange={setRating} />
+              <p className="text-sm text-zinc-400 mb-2">Album rating</p>
+              <div className="flex items-center gap-0.5">
+                {[1,2,3,4,5].map(star => {
+                  const full = displayRating >= star
+                  const half = !full && displayRating >= star - 0.5
+                  return (
+                    <div key={star} className="relative w-7 h-7 cursor-pointer">
+                      <svg viewBox="0 0 24 24" className="w-7 h-7 absolute">
+                        <defs>
+                          <linearGradient id={"ar-half-" + star}>
+                            <stop offset="50%" stopColor="#eac54f"/>
+                            <stop offset="50%" stopColor="transparent"/>
+                          </linearGradient>
+                        </defs>
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                          fill={full ? "#eac54f" : half ? "url(#ar-half-" + star + ")" : "none"}
+                          stroke={full || half ? "#eac54f" : "#52525b"}
+                          strokeWidth="1.5" strokeLinejoin="round"/>
+                      </svg>
+                      <div className="absolute inset-0 flex">
+                        <div className="w-1/2 h-full"
+                          onMouseEnter={() => setHoverRating(star - 0.5)}
+                          onMouseLeave={() => setHoverRating(0)}
+                          onClick={() => setRating(star - 0.5)} />
+                        <div className="w-1/2 h-full"
+                          onMouseEnter={() => setHoverRating(star)}
+                          onMouseLeave={() => setHoverRating(0)}
+                          onClick={() => setRating(star)} />
+                      </div>
+                    </div>
+                  )
+                })}
+                <span className="ml-2 text-zinc-400 text-sm w-8 text-right inline-block">
+                  {displayRating > 0 ? displayRating + "/5" : ""}
+                </span>
+              </div>
             </div>
 
+            {/* Love + notes */}
             <button onClick={() => setIsLoved(!isLoved)}
               className={"mb-5 flex items-center gap-2 text-sm px-4 py-2 rounded-full border transition-colors " +
                 (isLoved ? "border-red-500 text-red-400 bg-red-950/30" : "border-zinc-700 text-zinc-400 hover:border-zinc-500")}>
@@ -217,12 +383,10 @@ export default function FeedClient({ userName }: { userName: string }) {
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-zinc-500 focus:outline-none resize-none mb-5"
               rows={3} />
 
+            {/* Optional detail sliders */}
             <div className="mb-6">
-              <button
-                type="button"
-                onClick={() => setShowSliders(!showSliders)}
-                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1 mb-3"
-              >
+              <button type="button" onClick={() => setShowSliders(!showSliders)}
+                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1 mb-3">
                 <span>{showSliders ? "▾" : "▸"}</span>
                 {showSliders ? "Hide detailed ratings" : "Add detailed ratings (optional)"}
               </button>
@@ -246,86 +410,106 @@ export default function FeedClient({ userName }: { userName: string }) {
                       <input type="range" min={1} max={5} value={value}
                         onChange={e => set(Number(e.target.value))}
                         disabled={!enabled}
-                        className={"w-full accent-green-500 transition-opacity " + (enabled ? "opacity-100" : "opacity-30")} />
+                        className={"w-full accent-green-500 " + (enabled ? "opacity-100" : "opacity-30")} />
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            <button onClick={submitReview} disabled={submitting || rating === 0}
+            {/* Track ratings */}
+            <div className="border-t border-zinc-800 pt-5 mb-6">
+              <p className="text-sm font-medium text-zinc-300 mb-1">Rate individual tracks</p>
+
+              {loadingTracks ? (
+                <p className="text-zinc-500 text-sm">Loading tracklist...</p>
+              ) : (
+                <div className="space-y-2">
+                  {tracks.map(track => (
+                    <div key={track.id} className="flex items-center gap-3 py-2 border-b border-zinc-800/50 last:border-0">
+                      <span className="text-zinc-600 text-xs w-5 text-right shrink-0">{track.track_number}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm truncate">{track.name}</p>
+                        <p className="text-zinc-600 text-xs">{msToTime(track.duration_ms)}</p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <StarRating
+                          rating={trackRatings[track.id] ?? 0}
+                          onChange={r => setTrackRatings(prev => ({ ...prev, [track.id]: r }))}
+                          size="sm"
+                        />
+                        {trackRatings[track.id] && (
+                          <button onClick={() => setTrackRatings(prev => { const n = {...prev}; delete n[track.id]; return n })}
+                            className="text-zinc-600 hover:text-zinc-400 text-xs ml-1">✕</button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mb-4">
+              <label className="text-xs text-zinc-500 block mb-1">Listened on</label>
+              <input
+                type="date"
+                value={listenedAt}
+                max={(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}` })()}
+                onChange={e => setListenedAt(e.target.value)}
+                className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500"
+              />
+            </div>
+
+            <button onClick={submitReview} disabled={submitting || (rating === 0 && Object.keys(trackRatings).length === 0)}
               className="w-full bg-green-500 hover:bg-green-400 text-black font-semibold py-3 rounded-lg transition-colors disabled:opacity-50">
-              {submitting ? "Saving..." : "Save Review"}
+              {submitting ? "Saving..." : rating === 0 ? "Save Track Ratings Only" : "Save Review"}
             </button>
           </div>
         )}
 
-        {showReviews && (
-          <div>
-            <h2 className="text-xl font-bold mb-4">My Reviews</h2>
-            {reviews.length === 0 ? (
-              <p className="text-zinc-500">No reviews yet. Search for an album above!</p>
-            ) : (
-              <div className="space-y-3">
-                {reviews.map(r => (
-                  <div key={r.id}
-                    className="bg-zinc-900 rounded-lg overflow-hidden cursor-pointer hover:bg-zinc-800 transition-colors"
-                    onClick={() => setExpandedReview(expandedReview === r.id ? null : r.id)}>
-                    <div className="flex items-center gap-4 p-4">
-                      {r.album.coverUrl && (
-                        <img src={r.album.coverUrl} alt={r.album.title} className="w-12 h-12 rounded object-cover" />
-                      )}
-                      <div className="flex-1">
-                        <p className="font-medium">{r.album.title}</p>
-                        <p className="text-zinc-400 text-sm">{r.album.artistName}</p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <StarRating rating={r.rating} onChange={() => {}} />
-                        {r.isLoved && (
-                          <svg viewBox="0 0 24 24" className="w-6 h-6 text-red-400" fill="currentColor">
-                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                          </svg>
-                        )}
-                      </div>
-                      <span className="text-zinc-600 text-sm ml-1">{expandedReview === r.id ? "▲" : "▼"}</span>
-                    </div>
-                    {expandedReview === r.id && (
-                      <div className="px-4 pb-5 border-t border-zinc-800 pt-4 space-y-4">
-                        {r.notes && (
-                          <p className="text-zinc-300 text-sm italic leading-relaxed">"{r.notes}"</p>
-                        )}
-                        {(r.lyricsScore || r.productionScore || r.replayScore || r.emotionScore) && (
-                          <div className="space-y-2">
-                            {[
-                              { label: "Lyrics", value: r.lyricsScore },
-                              { label: "Production", value: r.productionScore },
-                              { label: "Replay Value", value: r.replayScore },
-                              { label: "Emotional Impact", value: r.emotionScore },
-                            ].filter(s => s.value).map(({ label, value }) => (
-                              <div key={label} className="flex items-center gap-3">
-                                <span className="text-zinc-500 text-xs w-32 shrink-0">{label}</span>
-                                <div className="flex-1 bg-zinc-800 rounded-full h-1.5">
-                                  <div
-                                    className="bg-green-500 h-1.5 rounded-full"
-                                    style={{ width: `${(value! / 5) * 100}%` }}
-                                  />
-                                </div>
-                                <span className="text-zinc-400 text-xs w-6 text-right">{value}/5</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {!r.notes && !r.lyricsScore && !r.productionScore && !r.replayScore && !r.emotionScore && (
-                          <p className="text-zinc-600 text-sm">No additional details added.</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
+        {/* Playlist Generator */}
+        <div className="mt-8 border-t border-zinc-800 pt-8">
+          <button onClick={() => setShowPlaylist(!showPlaylist)}
+            className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors mb-4">
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 18V5l12-2v13M9 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12-2c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z"/>
+            </svg>
+            <span className="font-medium">Generate a Playlist</span>
+            <span className="text-zinc-600 text-sm">{showPlaylist ? "▲" : "▼"}</span>
+          </button>
+
+          {showPlaylist && (
+            <div className="bg-zinc-900 rounded-xl p-6">
+              <p className="text-zinc-400 text-sm mb-5">Generates a Spotify playlist from your highest-rated individual tracks.</p>
+              <div className="space-y-4 mb-6">
+                <div>
+                  <PlaylistStarPicker value={minRating} onChange={setMinRating} />
+                </div>
+                <div>
+                  <label className="text-sm text-zinc-400 block mb-2">Playlist name (optional)</label>
+                  <input type="text" value={playlistName} onChange={e => setPlaylistName(e.target.value)}
+                    placeholder={"TunedIn: " + minRating + "+ stars"}
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder-zinc-500 focus:outline-none text-sm" />
+                </div>
               </div>
-            )}
-          </div>
-        )}
+              <button onClick={generatePlaylist} disabled={generating}
+                className="w-full bg-green-500 hover:bg-green-400 text-black font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                {generating ? "Generating..." : "Create Playlist on Spotify"}
+              </button>
+              {generatedPlaylist && (
+                <div className="mt-4 bg-green-900/30 border border-green-700 rounded-lg p-4">
+                  <p className="text-green-300 font-medium mb-1">Playlist created!</p>
+                  <p className="text-zinc-400 text-sm mb-3">{generatedPlaylist.trackCount} tracks from your ratings</p>
+                  <a href={generatedPlaylist.url} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 bg-green-500 hover:bg-green-400 text-black font-semibold px-4 py-2 rounded-lg text-sm transition-colors">
+                    Open in Spotify →
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
       </div>
     </main>
   )

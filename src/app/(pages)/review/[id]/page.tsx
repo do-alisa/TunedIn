@@ -2,6 +2,7 @@ import { getSession } from "@/lib/session"
 import { redirect, notFound } from "next/navigation"
 import { PrismaClient } from "@prisma/client"
 import Link from "next/link"
+import DeleteReviewButton from "./DeleteReviewButton"
 
 const prisma = new PrismaClient()
 
@@ -19,13 +20,10 @@ function StarRating({ rating }: { rating: number }) {
                 <stop offset="50%" stopColor="transparent"/>
               </linearGradient>
             </defs>
-            <path
-              d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
               fill={full ? "#eac54f" : half ? "url(#h" + star + ")" : "none"}
               stroke={full || half ? "#eac54f" : "#52525b"}
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-            />
+              strokeWidth="1.5" strokeLinejoin="round"/>
           </svg>
         )
       })}
@@ -34,13 +32,10 @@ function StarRating({ rating }: { rating: number }) {
   )
 }
 
-type PageProps = {
-  params: Promise<{ id: string }>
-}
+type PageProps = { params: Promise<{ id: string }> }
 
 export default async function ReviewPage({ params }: PageProps) {
   const { id } = await params
-
   const session = await getSession()
   if (!session) redirect("/login")
 
@@ -51,6 +46,7 @@ export default async function ReviewPage({ params }: PageProps) {
 
   if (!review) notFound()
 
+  const isOwner = review.userId === session.user.id
   const scores = [
     { label: "Lyrics", value: review.lyricsScore },
     { label: "Production", value: review.productionScore },
@@ -62,9 +58,12 @@ export default async function ReviewPage({ params }: PageProps) {
     <main className="min-h-screen bg-zinc-950 text-white">
       <div className="max-w-2xl mx-auto p-8">
 
-        <Link href="/profile" className="text-zinc-500 hover:text-white text-sm transition-colors mb-8 inline-block">
-          Back to profile
-        </Link>
+        <div className="flex items-center justify-between mb-8">
+          <Link href="/profile" className="text-zinc-500 hover:text-white text-sm transition-colors">
+            Back to profile
+          </Link>
+          {isOwner && <DeleteReviewButton reviewId={review.id} />}
+        </div>
 
         <div className="flex gap-6 mb-8">
           {review.album.coverUrl && (
@@ -102,8 +101,7 @@ export default async function ReviewPage({ params }: PageProps) {
                 <div key={label} className="flex items-center gap-4">
                   <span className="text-zinc-400 text-sm w-36 shrink-0">{label}</span>
                   <div className="flex-1 bg-zinc-800 rounded-full h-2">
-                    <div className="bg-green-500 h-2 rounded-full"
-                      style={{ width: `${(value! / 5) * 100}%` }} />
+                    <div className="bg-green-500 h-2 rounded-full" style={{ width: `${(value! / 5) * 100}%` }} />
                   </div>
                   <span className="text-zinc-300 text-sm w-8 text-right">{value}/5</span>
                 </div>
@@ -118,7 +116,7 @@ export default async function ReviewPage({ params }: PageProps) {
           )}
           <span>Reviewed by <span className="text-zinc-300">{review.user.name}</span></span>
           <span>·</span>
-          <span>{new Date(review.createdAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</span>
+          <span>Listened {new Date(review.listenedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</span>
         </div>
 
       </div>
