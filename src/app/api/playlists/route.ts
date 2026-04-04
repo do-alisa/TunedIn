@@ -21,21 +21,13 @@ export async function POST(request: NextRequest) {
 
   const { minRating, playlistName } = await request.json()
 
-  const account = await prisma.account.findFirst({
-    where: { userId: session.userId, provider: "spotify" },
-  })
-  if (!account?.access_token) {
-    return NextResponse.json({ error: "No Spotify token — please log in again" }, { status: 401 })
-  }
-
-  // Get track ratings above the minimum
   const trackRatings = await prisma.trackRating.findMany({
     where: {
       userId: session.userId,
       rating: { gte: minRating ?? 0 },
     },
     include: { track: true },
-    orderBy: { rating: "desc" },
+    orderBy: { createdAt: "desc" },
   })
 
   if (trackRatings.length === 0) {
@@ -44,64 +36,26 @@ export async function POST(request: NextRequest) {
     }, { status: 400 })
   }
 
-  // Build Spotify track URIs
-  const trackUris = trackRatings.map(r => `spotify:track:${r.track.spotifyTrackId}`)
+  const tracks = trackRatings.map(r => ({
+    title: r.track.title,
+    spotifyTrackId: r.track.spotifyTrackId,
+    rating: r.rating,
+    spotifyUrl: `https://open.spotify.com/track/${r.track.spotifyTrackId}`,
+  }))
 
-  // Get Spotify user ID
-  const meRes = await fetch("https://api.spotify.com/v1/me", {
-    headers: { Authorization: `Bearer ${account.access_token}` },
-  })
-  const me = await meRes.json()
-
-  // Create Spotify playlist
-  const createRes = await fetch(
-    `https://api.spotify.com/v1/me/playlists`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${account.access_token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name: playlistName || `TunedIn: ${minRating}+ star tracks`,
-        description: `${trackRatings.length} tracks rated ${minRating}+ stars on TunedIn`,
-        public: false,
-      }),
-    }
-  )
-  const playlist = await createRes.json()
-
-  if (!playlist.id) {
-    console.error('Spotify create playlist error:', JSON.stringify(playlist))
-    return NextResponse.json({ error: "Failed to create Spotify playlist", detail: playlist }, { status: 500 })
-  }
-
-  // Add tracks in batches of 100
-  for (let i = 0; i < trackUris.length; i += 100) {
-    await fetch(`https://api.spotify.com/v1/playlists/${playlist.id}/tracks`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${account.access_token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ uris: trackUris.slice(i, i + 100) }),
-    })
-  }
-
-  // Save to database
+  // Save to database for history
   await prisma.playlist.create({
     data: {
       userId: session.userId,
       title: playlistName || `TunedIn: ${minRating}+ star tracks`,
       sourceGenres: [],
       minRating: minRating ?? 0,
-      spotifyPlaylistId: playlist.id,
     },
   })
 
   return NextResponse.json({
-    playlistId: playlist.id,
-    playlistUrl: playlist.external_urls?.spotify,
-    trackCount: trackUris.length,
+    tracks,
+    trackCount: tracks.length,
+    playlistName: playlistName || `TunedIn: ${minRating}+ star tracks`,
   })
 }
